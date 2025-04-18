@@ -27,6 +27,11 @@ variable "enable_actions" {
   type        = bool
 }
 
+variable "cloudtrail_sns_arn" {
+  description = "Optional ARN of the CloudTrail SNS topic to allow subscription actions"
+  type        = string
+}
+
 resource "aws_iam_role" "relay_security" {
   name = "RelaySecurityIntegration"
 
@@ -59,9 +64,9 @@ resource "aws_iam_role_policy_attachment" "view_only" {
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
-resource "aws_iam_role_policy" "relay_security_actions" {
+resource "aws_iam_role_policy" "remediation_actions" {
   count = var.enable_actions ? 1 : 0
-  name  = "RelaySecurityActions"
+  name  = "RelaySecurityRemediationActions"
   role  = aws_iam_role.relay_security.name
   policy = jsonencode({
     Version = "2012-10-17"
@@ -77,6 +82,25 @@ resource "aws_iam_role_policy" "relay_security_actions" {
           "ec2:UpdateSecurityGroupRuleDescriptionsIngress"
         ]
         Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudtrail_sns" {
+  count = var.cloudtrail_sns_arn != "" ? 1 : 0
+  name  = "RelaySecurityCloudTrailSns"
+  role  = aws_iam_role.relay_security.name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Subscribe",
+          "sns:Unsubscribe"
+        ]
+        Resource = var.cloudtrail_sns_arn
       }
     ]
   })

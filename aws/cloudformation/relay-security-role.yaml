@@ -14,6 +14,11 @@ Parameters:
       - "false"
     Description: Whether to enable additional EC2 actions for Relay Security
 
+  CloudTrailSnsArn:
+    Type: String
+    Description: Optional ARN of the CloudTrail SNS topic to allow subscription actions
+    Default: ""
+
 Resources:
   RelaySecurityIntegrationRole:
     Type: AWS::IAM::Role
@@ -32,25 +37,43 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/SecurityAudit
         - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
-      Policies: !If
-        - EnableActions
-        - - PolicyName: RelaySecurityActions
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - ec2:CreateSnapshot
-                    - ec2:CreateTags
-                    - ec2:ModifyInstanceAttribute
-                    - ec2:TerminateInstances
-                    - ec2:UpdateSecurityGroupRuleDescriptionsEgress
-                    - ec2:UpdateSecurityGroupRuleDescriptionsIngress
-                  Resource: "*"
-        - []
+  RemediationActionsPolicy:
+    Type: AWS::IAM::RolePolicy
+    Condition: EnableActions
+    Properties:
+      RoleName: !Ref RelaySecurityIntegrationRole
+      PolicyName: RelaySecurityRemediationActions
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ec2:CreateSnapshot
+              - ec2:CreateTags
+              - ec2:ModifyInstanceAttribute
+              - ec2:TerminateInstances
+              - ec2:UpdateSecurityGroupRuleDescriptionsEgress
+              - ec2:UpdateSecurityGroupRuleDescriptionsIngress
+            Resource: "*"
+
+  CloudTrailSnsPolicy:
+    Type: AWS::IAM::RolePolicy
+    Condition: HasCloudTrailSnsArn
+    Properties:
+      RoleName: !Ref RelaySecurityIntegrationRole
+      PolicyName: RelaySecurityCloudTrailSns
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - sns:Subscribe
+              - sns:Unsubscribe
+            Resource: !Ref CloudTrailSnsArn
 
 Conditions:
   EnableActions: !Equals [!Ref EnableActions, "true"]
+  HasCloudTrailSnsArn: !Not [!Equals [!Ref CloudTrailSnsArn, ""]]
 
 Outputs:
   RoleArn:
