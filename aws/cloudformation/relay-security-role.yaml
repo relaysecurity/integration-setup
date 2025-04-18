@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template for Relay Security IAM role and policies"
+
+Parameters:
+  ExternalId:
+    Type: String
+    Description: The external ID that Relay Security uses to assume this role for your tenant
+
+  EnableActions:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Whether to enable additional EC2 actions for Relay Security
+
+Resources:
+  RelaySecurityIntegrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: RelaySecurityIntegration
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::715841372611:root
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/SecurityAudit
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+      Policies: !If
+        - EnableActions
+        - - PolicyName: RelaySecurityActions
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ec2:CreateSnapshot
+                    - ec2:CreateTags
+                    - ec2:ModifyInstanceAttribute
+                    - ec2:TerminateInstances
+                    - ec2:UpdateSecurityGroupRuleDescriptionsEgress
+                    - ec2:UpdateSecurityGroupRuleDescriptionsIngress
+                  Resource: "*"
+        - []
+
+Conditions:
+  EnableActions: !Equals [!Ref EnableActions, "true"]
+
+Outputs:
+  RoleArn:
+    Description: The ARN of the Relay Security IAM role
+    Value: !GetAtt RelaySecurityIntegrationRole.Arn
